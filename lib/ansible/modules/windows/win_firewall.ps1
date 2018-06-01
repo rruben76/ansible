@@ -34,8 +34,8 @@ $result = @{
     state = $state
 }
 
-if ($PSVersionTable.PSVersion -lt [Version]"5.0") {
-    Fail-Json $result "win_firewall requires Windows Management Framework 5 or higher."
+if ([System.Environment]::OSVersion.Version -lt [Version] 6.2) {
+    Fail-Json $result "win_firewall requires Windows Server 2012/ Windows 8 or higher"
 }
 
 Try {

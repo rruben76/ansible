@@ -44,7 +44,7 @@ Try {
 
         $currentstate = (Get-NetFirewallProfile -Name $profile).Enabled
         $result.$profile = @{
-            enabled = ($currentstate -eq 1)
+            enabled = ($currentstate -eq [Microsoft.PowerShell.Cmdletization.GeneratedTypes.NetSecurity.GpoBoolean]::True)
             considered = ($profiles -contains $profile)
             currentstate = $currentstate
         }
@@ -55,7 +55,7 @@ Try {
 
         if ($state -eq 'enabled') {
 
-            if ($currentstate -eq $false) {
+            if ($currentstate -eq [Microsoft.PowerShell.Cmdletization.GeneratedTypes.NetSecurity.GpoBoolean]::False) {
                 Set-NetFirewallProfile -name $profile -Enabled true -WhatIf:$check_mode
                 $result.changed = $true
                 $result.$profile.enabled = $true
@@ -63,7 +63,7 @@ Try {
 
         } else {
 
-            if ($currentstate -eq $true) {
+            if ($currentstate -eq [Microsoft.PowerShell.Cmdletization.GeneratedTypes.NetSecurity.GpoBoolean]::True) {
                 Set-NetFirewallProfile -name $profile -Enabled false -WhatIf:$check_mode
                 $result.changed = $true
                 $result.$profile.enabled = $false

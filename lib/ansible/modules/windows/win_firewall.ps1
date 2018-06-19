@@ -22,6 +22,10 @@
 $ErrorActionPreference = "Stop"
 $firewall_profiles = @('Domain', 'Private', 'Public')
 
+$NET_FW_PROFILE2_DOMAIN = 1
+$NET_FW_PROFILE2_PRIVATE = 2
+$NET_FW_PROFILE2_PUBLIC = 4
+
 $params = Parse-Args $args -supports_check_mode $true
 $check_mode = Get-AnsibleParam -obj $params -name "_ansible_check_mode" -type "bool" -default $false
 
@@ -34,41 +38,82 @@ $result = @{
     state = $state
 }
 
-if ([System.Environment]::OSVersion.Version -lt [Version] 6.2) {
-    Fail-Json $result "win_firewall requires Windows Server 2012/ Windows 8 or higher"
-}
-
 Try {
+    if ([System.Environment]::OSVersion.Version -lt [Version] 6.2) {
+        
+        $fwPolicy2 = New-Object -ComObject HNetCfg.FwPolicy2
 
-    ForEach ($profile in $firewall_profiles) {
+        
+        ForEach ($profile in $firewall_profiles) {
+            
+            $currentProfile = "none"
+            switch ($profile)
+            {
+                "Domain" {  $currentProfile = $NET_FW_PROFILE2_DOMAIN }
+                "Private" {  $currentProfile = $NET_FW_PROFILE2_PRIVATE }
+                "Public" {  $currentProfile = $NET_FW_PROFILE2_PUBLIC }
+            }
+                    
+            $currentstate = $fwPolicy2.FirewallEnabled($currentProfile)
 
-        $currentstate = (Get-NetFirewallProfile -Name $profile).Enabled
-        $result.$profile = @{
-            enabled = ($currentstate -eq [Microsoft.PowerShell.Cmdletization.GeneratedTypes.NetSecurity.GpoBoolean]::True)
-            considered = ($profiles -contains $profile)
-            currentstate = $currentstate
-        }
-
-        if ($profiles -notcontains $profile) {
-            continue
-        }
-
-        if ($state -eq 'enabled') {
-
-            if ($currentstate -eq [Microsoft.PowerShell.Cmdletization.GeneratedTypes.NetSecurity.GpoBoolean]::False) {
-                Set-NetFirewallProfile -name $profile -Enabled true -WhatIf:$check_mode
-                $result.changed = $true
-                $result.$profile.enabled = $true
+            $result.$profile = @{
+                enabled = ($currentstate -eq $true)
+                considered = ($profiles -contains $profile)
+                currentstate = $currentstate
             }
 
-        } else {
+            if ($profiles -notcontains $profile) {
+                continue
+            }        
+            
+            if ($state -eq 'enabled') {
+                if ($currentstate -eq $false) {
+                    $fwPolicy2.FirewallEnabled($currentProfile) = $true
+                    $result.changed = $true
+                    $result.$profile.enabled = $true
+                }
+            } else {
 
-            if ($currentstate -eq [Microsoft.PowerShell.Cmdletization.GeneratedTypes.NetSecurity.GpoBoolean]::True) {
-                Set-NetFirewallProfile -name $profile -Enabled false -WhatIf:$check_mode
-                $result.changed = $true
-                $result.$profile.enabled = $false
+                if ($currentstate -eq $true) {
+                    $fwPolicy2.FirewallEnabled($currentProfile) = $false    
+                    $result.changed = $true
+                    $result.$profile.enabled = $false
+                }
+
+            }                
+        }
+    }
+    else {
+            ForEach ($profile in $firewall_profiles) {
+
+            $currentstate = (Get-NetFirewallProfile -Name $profile).Enabled
+            $result.$profile = @{
+                enabled = ($currentstate -eq [Microsoft.PowerShell.Cmdletization.GeneratedTypes.NetSecurity.GpoBoolean]::True)
+                considered = ($profiles -contains $profile)
+                currentstate = $currentstate
             }
 
+            if ($profiles -notcontains $profile) {
+                continue
+            }
+
+            if ($state -eq 'enabled') {
+
+                if ($currentstate -eq [Microsoft.PowerShell.Cmdletization.GeneratedTypes.NetSecurity.GpoBoolean]::False) {
+                    Set-NetFirewallProfile -name $profile -Enabled true -WhatIf:$check_mode
+                    $result.changed = $true
+                    $result.$profile.enabled = $true
+                }
+
+            } else {
+
+                if ($currentstate -eq [Microsoft.PowerShell.Cmdletization.GeneratedTypes.NetSecurity.GpoBoolean]::True) {
+                    Set-NetFirewallProfile -name $profile -Enabled false -WhatIf:$check_mode
+                    $result.changed = $true
+                    $result.$profile.enabled = $false
+                }
+
+            }
         }
     }
 } Catch {
